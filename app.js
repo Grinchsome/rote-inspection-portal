@@ -70,7 +70,7 @@ function updateProgress(){
   const total = data.records.length;
   const done = data.records.filter(r=>r && r.inspected).length;
   const el = $('progress');
-  if(el) el.textContent = total ? `Inspected: ${done} / ${total}` : '';
+  if(el) el.textContent = total ? `Inspected ${done} / ${total}` : '';
 }
 
 function render(){const host=$('assetList');host.innerHTML="";
