@@ -1,5 +1,37 @@
-const CACHE="rote-mobile-inspector-v1";
-const ASSETS=["./","./index.html","./styles.css","./app.js","./data.json","./manifest.webmanifest"];
-self.addEventListener("install",(e)=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
-self.addEventListener("activate",(e)=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener("fetch",(e)=>{e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));});
+const CACHE_NAME = 'rote-inspection-portal-v1-2-26';
+const ASSETS = [
+  './',
+  './index.html',
+  './styles.css?v=26',
+  './app.js?v=26',
+  './data.json?v=26',
+  './manifest.webmanifest?v=26'
+];
+
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS).catch(() => null))
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    )).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  event.respondWith(
+    fetch(req).then(res => {
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(req, copy)).catch(() => null);
+      return res;
+    }).catch(() => caches.match(req).then(cached => cached || caches.match('./index.html')))
+  );
+});
