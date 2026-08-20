@@ -10,6 +10,49 @@ function _asList(v){
 const $=(id)=>document.getElementById(id);
 let data={meta:{customer:"",site:"",space:"",inspectionDate:"",reportOutcome:""},records:[]};
 let editIndex = null;
+let showUninspectedOnly = false;
+
+let assetTypeOptions = [];
+function setupAssetTypeFilter(items){
+  assetTypeOptions = (items||[]).filter(Boolean);
+  const input = $('assetTypeInput');
+  const box = $('assetTypeSuggest');
+  if(!input || !box) return;
+
+  const show = () => {
+    const q = (input.value||'').toLowerCase().trim();
+    let matches = assetTypeOptions;
+    if(q){
+      matches = assetTypeOptions.filter(x => x.toLowerCase().includes(q));
+    }
+    matches = matches.slice(0, 40);
+    if(!matches.length){
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = matches.map(x => `<div class="suggestItem" data-val="${escapeHtml(x)}">${escapeHtml(x)}</div>`).join('');
+    box.classList.remove('hidden');
+    box.querySelectorAll('.suggestItem').forEach(item => {
+      const choose = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        input.value = item.getAttribute('data-val') || '';
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        input.blur();
+      };
+      item.addEventListener('click', choose);
+      item.addEventListener('touchstart', choose, {passive:false});
+    });
+  };
+
+  input.addEventListener('input', show);
+  input.addEventListener('focus', show);
+  input.addEventListener('click', show);
+  input.addEventListener('blur', () => setTimeout(() => box.classList.add('hidden'), 220));
+}
+
 const escapeHtml=(s)=>String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 const idKey=(v)=>{const m=String(v||"").match(/(\d+)/);return m?parseInt(m[1],10):1e12;};
 const selectedMulti=(sel)=>Array.from(sel.selectedOptions).map(o=>o.value);
@@ -43,9 +86,31 @@ function fillDatalist(dl,items){dl.innerHTML="";for(const it of items){const o=d
 function showBlocks(){const adv=$('cAdv').checked, fail=$('cFail').checked, lim=$('cLim').checked;
 $('advBlock').classList.toggle('hidden',!adv);$('failBlock').classList.toggle('hidden',!fail);$('limBlock').classList.toggle('hidden',!lim);
 $('failChecklistOnly').classList.toggle('hidden',adv);}
-function clearForm(){['assetId','assetDesignation','typeNotes','loadInfo','advNotes','failOther','failNotes','limDetails','limNotes','thisInspection','assetTypeInput'].forEach(id=>{const el=$(id); if(el) el.value='';});
+function setDesignationValue(value, note){
+  const sel=$('assetDesignation');
+  const other=$('assetDesignationOther');
+  const wrap=$('assetDesignationOtherWrap');
+  const v=String(value||'').trim();
+  const n=String(note||'').trim();
+  if(!sel) return;
+  const has=[...sel.options].some(o=>o.value===v);
+  if(v && has){
+    sel.value=v;
+    if(other) other.value=n;
+    if(wrap) wrap.classList.toggle('hidden', v !== 'Other');
+  }else if(v){
+    sel.value='Other';
+    if(other) other.value=n || v;
+    if(wrap) wrap.classList.remove('hidden');
+  }else{
+    sel.value='';
+    if(other) other.value=n;
+    if(wrap) wrap.classList.add('hidden');
+  }
+}
+function clearForm(){['assetId','assetDesignation','assetDesignationOther','customerAssetId','typeNotes','loadInfo','advNotes','failOther','failNotes','limDetails','limNotes','thisInspection','assetTypeInput'].forEach(id=>{const el=$(id); if(el) el.value='';});
 ['cPass','cFail','cAdv','cLim','chkGenericPhotos','chkFixingsPhotos','chkObsPhotos','chkRemedial','chkGenericPhotosF','chkFixingsPhotosF','chkObsPhotosF','chkRemedialF','chkLimDetails','chkLimPhotos'].forEach(id=>{const el=$(id); if(el) el.checked=false;});
-if($('advActions')) $('advActions').selectedIndex=-1;if($('failDefects')) $('failDefects').selectedIndex=-1;if($('failOtherWrap')) $('failOtherWrap').classList.add('hidden');if($('assetTypeInput')) $('assetTypeInput').value='';
+if($('advActions')) $('advActions').selectedIndex=-1;if($('failDefects')) $('failDefects').selectedIndex=-1;if($('failOtherWrap')) $('failOtherWrap').classList.add('hidden');if($('assetTypeInput')) $('assetTypeInput').value='';if($('assetTypeSuggest')) $('assetTypeSuggest').classList.add('hidden');
 showBlocks();$('addMsg').textContent="";}
 function sortAssets(){data.records.sort((a,b)=>idKey(a.assetId)-idKey(b.assetId));}
 function renumber(){data.records.forEach((r,i)=>r.assetNo=i+1);}
@@ -74,9 +139,24 @@ function updateProgress(){
 }
 
 function render(){const host=$('assetList');host.innerHTML="";
-data.records.forEach((r,i)=>{const div=document.createElement('div');div.className='assetItem';
+const q=(($('assetSearch')&&$('assetSearch').value)||'').toLowerCase().trim();
+let visibleCount=0;
+data.records.forEach((r,i)=>{
+const hay=[
+  r.assetNo,
+  r.origAssetNo,
+  r.assetId,
+  r.customerAssetId,
+  r.assetDesignation,
+  r.assetDesignationOther,
+  r.assetType
+].map(x=>String(x||'').toLowerCase()).join(' ');
+if(q && !hay.includes(q)) return;
+if(showUninspectedOnly && r.inspected) return;
+visibleCount++;
+const div=document.createElement('div');div.className='assetItem';div.setAttribute('data-asset-id', r.assetId || '');
 const conds=[];if(r.pass)conds.push('Pass');if(r.advisory)conds.push('Advisory');if(r.limitation)conds.push('Limitation');if(r.fail)conds.push('Fail');
-div.innerHTML=`<div class="assetHead"><div><div><strong>Asset ${r.assetNo||i+1}</strong> — ID ${escapeHtml(r.assetId||"")}${r.assetDesignation?(' — '+escapeHtml(r.assetDesignation)):''} — ${escapeHtml(r.assetType||"")}</div>${r.typeNotes?`<div class="small">Notes: ${escapeHtml(r.typeNotes)}</div>`:""}</div>
+div.innerHTML=`<div class="assetHead"><div><div><strong>Asset ${r.assetNo||i+1}</strong> — ID ${escapeHtml(r.assetId||"")}${r.assetDesignation?(' — '+escapeHtml(r.assetDesignation)+(r.assetDesignationOther?' ('+escapeHtml(r.assetDesignationOther)+')':'')):''}${r.customerAssetId?(' — Customer Asset ID: '+escapeHtml(r.customerAssetId)):''} — ${escapeHtml(r.assetType||"")}</div>${r.typeNotes?`<div class="small">Notes: ${escapeHtml(r.typeNotes)}</div>`:""}</div>
 <div class="badges">${conds.map(badge).join("")}</div></div>
 <div class="row" style="margin-top:10px"><label class="small" style="display:flex;align-items:center;gap:8px;margin-right:10px;"><input type="checkbox" data-inspected="${i}" ${r.inspected?"checked":""}> Inspected</label>
         ${((r.prevAdv||(r.advActions&&r.advActions.length)||(r.improvements&&r.improvements.length)) || (r.prevFail||(r.failDefects&&r.failDefects.length)||(r.defects&&r.defects.length)) || (r.prevLim||r.limDetails||r.limNotes||(r.limitations&&r.limitations.length)))?`<div class=\"row noSelect\" style=\"gap:10px;flex-wrap:wrap;margin-top:6px\">${(r.prevAdv||(r.advActions&&r.advActions.length)||(r.improvements&&r.improvements.length))?`<button type=\"button\" class=\"tagBtn\" data-info=\"adv\" data-i=\"${i}\">View advisory</button>`:''}${(r.prevFail||(r.failDefects&&r.failDefects.length)||(r.defects&&r.defects.length))?`<button type=\"button\" class=\"tagBtn\" data-info=\"fail\" data-i=\"${i}\">View fail</button>`:''}${(r.prevLim||r.limDetails||r.limNotes||(r.limitations&&r.limitations.length))?`<button type=\"button\" class=\"tagBtn\" data-info=\"lim\" data-i=\"${i}\">View limitation</button>`:''}</div>`:''}
@@ -105,14 +185,25 @@ host.querySelectorAll('[data-info]').forEach(btn=>{
     data.records[i].inspected = cb.checked;
     save();
     updateProgress();
+    if(showUninspectedOnly) render();
   }));
+
+const sc=$('searchCount');
+if(sc){
+  const total=data.records.length;
+  const filterParts=[];
+  if(q) filterParts.push('search');
+  if(showUninspectedOnly) filterParts.push('uninspected only');
+  sc.textContent = filterParts.length ? `Showing ${visibleCount} of ${total} assets (${filterParts.join(' + ')})` : (total ? `${total} assets loaded` : '');
+}
 
 host.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',()=>{
   const i=parseInt(btn.getAttribute('data-edit'),10);
   const a=data.records[i]; if(!a) return;
   editIndex = i;
   $('assetId').value = a.assetId||'';
-  if($('assetDesignation')) $('assetDesignation').value = a.assetDesignation||'';
+  setDesignationValue(a.assetDesignation||'', a.assetDesignationOther||'');
+  if($('customerAssetId')) $('customerAssetId').value = a.customerAssetId||'';
   $('assetTypeInput').value = a.assetType||'Other';
   $('typeNotes').value = a.typeNotes||'';
   if($('loadInfo')) $('loadInfo').value = a.loadInfo||'';
@@ -135,7 +226,7 @@ host.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',(
   $('btnAddAsset').textContent = 'Update asset';
   $('btnCancelEdit').style.display = '';
   showBlocks();
-  window.scrollTo({top:0,behavior:'smooth'});
+  const addCard=$('addAssetCard'); if(addCard) addCard.scrollIntoView({behavior:'smooth',block:'start'});
 }));}
 function buildCopy(){sortAssets();renumber();save();
 const m=data.meta, lines=[];
@@ -143,7 +234,7 @@ lines.push(`Site: ${m.site||""}`.trim());lines.push(`Space: ${m.space||""}`.trim
 if(m.inspectionDate)lines.push(`Date of inspection: ${m.inspectionDate}`.trim());
 if(m.reportOutcome)lines.push(`Report outcome: ${m.reportOutcome}`.trim());lines.push("");
 for(const r of data.records){
-lines.push(`Asset ${r.assetNo} — ID ${r.assetId}${r.assetDesignation?(' — '+r.assetDesignation):''} — ${r.assetType}`.trim());
+lines.push(`Asset ${r.assetNo} — ID ${r.assetId}${r.assetDesignation?(' — '+r.assetDesignation):''}${r.assetDesignationOther?(' ('+r.assetDesignationOther+')'):''}${r.customerAssetId?(' — Customer Asset ID: '+r.customerAssetId):''} — ${r.assetType}`.trim());
 const c=[];if(r.pass)c.push("Pass");if(r.advisory)c.push("Advisory");if(r.limitation)c.push("Limitation");if(r.fail)c.push("Fail");
 lines.push(`Condition: ${c.join(" + ")}`.trim());
 if(r.typeNotes)lines.push(`Notes: ${r.typeNotes}`);
@@ -199,6 +290,8 @@ function importJSON(file){
       prevAdv:'',prevFail:'',prevLim:'', ...r};
           rr.prevAdv = rr.prevAdv || rr.advDetails || rr.advisoryDetails || (rr.advActions && rr.advActions.length ? rr.advActions.join('\\n') : '') || (rr.improvements && rr.improvements.length ? rr.improvements.join('\\n') : '') || '';
           rr.prevFail = rr.prevFail || rr.failDetails || rr.defectDetails || (rr.failDefects && rr.failDefects.length ? rr.failDefects.join('\\n') : '') || (rr.defects && rr.defects.length ? rr.defects.join('\\n') : '') || '';
+          rr.assetDesignationOther = rr.assetDesignationOther || '';
+          rr.customerAssetId = rr.customerAssetId || '';
           rr.limDetails = rr.limDetails || rr.limitationDetails || '';
           rr.prevLim = rr.prevLim || rr.limDetails || rr.limitationDetails || (rr.limNotes ? rr.limNotes : '') || (rr.limitations && rr.limitations.length ? rr.limitations.join('\\n') : '') || '';
           return rr;
@@ -243,11 +336,30 @@ w.document.write(`<html><head><meta name="viewport" content="width=device-width,
 <div class="meta">Site: ${escapeHtml(m.site||"")}<br/>Space: ${escapeHtml(m.space||"")}${m.inspectionDate?("<br/>Report: "+escapeHtml(m.inspectionDate)):""}</div>${lines}
 <script>window.focus();</script></body></html>`);w.document.close();}
 async function init(){
-const cfg=await fetch('./data.json?v=26', {cache:'no-store'}).then(r=>r.json());
-fillDatalist($('assetTypeList'),cfg.assetTypes);fillSelect($('advActions'),cfg.advisoryActions);fillSelect($('failDefects'),cfg.failDefects);
+const cfg=await fetch('./data.json?v=29', {cache:'no-store'}).then(r=>r.json());
+setupAssetTypeFilter(cfg.assetTypes||[]);fillSelect($('advActions'),cfg.advisoryActions);fillSelect($('failDefects'),cfg.failDefects);
 ['cAdv','cFail','cLim'].forEach(id=>$(id).addEventListener('change',showBlocks));
+if($('assetDesignation')) $('assetDesignation').addEventListener('change',()=>{
+  const wrap=$('assetDesignationOtherWrap');
+  if(wrap) wrap.classList.toggle('hidden', $('assetDesignation').value !== 'Other');
+});
 $('failDefects').addEventListener('change',()=>{const opts=selectedMulti($('failDefects')).map(s=>s.toLowerCase());
 $('failOtherWrap').classList.toggle('hidden',!opts.some(s=>s.startsWith('other')));});
+
+if($('assetSearch')) $('assetSearch').addEventListener('input',()=>render());
+if($('btnClearSearch')) $('btnClearSearch').addEventListener('click',()=>{
+  if($('assetSearch')) $('assetSearch').value='';
+  render();
+});
+
+if($('btnShowUninspected')) $('btnShowUninspected').addEventListener('click',()=>{
+  showUninspectedOnly = !showUninspectedOnly;
+  $('btnShowUninspected').textContent = showUninspectedOnly ? 'Showing uninspected only' : 'Show uninspected only';
+  $('btnShowUninspected').classList.toggle('active', showUninspectedOnly);
+  render();
+});
+
+
 
 $('btnAddAsset').addEventListener('click',()=>{
   const assetId = ($('assetId').value||'').trim();
@@ -260,6 +372,8 @@ $('btnAddAsset').addEventListener('click',()=>{
     assetId: assetId,
     inspected: false,
     assetDesignation: ($('assetDesignation').value||'').trim(),
+    assetDesignationOther: ($('assetDesignationOther').value||'').trim(),
+    customerAssetId: ($('customerAssetId').value||'').trim(),
     assetType: ($('assetTypeInput').value||'Other'),
     typeNotes: ($('typeNotes').value||'').trim(),
     loadInfo: ($('loadInfo').value||'').trim(),
@@ -284,10 +398,12 @@ $('btnAddAsset').addEventListener('click',()=>{
     chkLimPhotos: $('chkLimPhotos')?$('chkLimPhotos').checked:false
   };
 
+  let scrollToAssetId = null;
   if(editIndex !== null){
     // Preserve original index record replacement
     r.inspected = (data.records[editIndex] && typeof data.records[editIndex].inspected === 'boolean') ? data.records[editIndex].inspected : false;
     data.records[editIndex] = r;
+    scrollToAssetId = r.assetId;
     editIndex = null;
     $('btnAddAsset').textContent = 'Add asset';
     $('btnCancelEdit').style.display = 'none';
@@ -299,6 +415,13 @@ $('btnAddAsset').addEventListener('click',()=>{
 
   sortAssets(); renumber(); save(); render(); updateProgress();
   clearForm();
+  if(scrollToAssetId){
+    setTimeout(()=>{
+      const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(scrollToAssetId)) : String(scrollToAssetId).replace(/"/g,'\\"');
+      const target = document.querySelector(`[data-asset-id="${safeId}"]`);
+      if(target) target.scrollIntoView({behavior:'smooth',block:'center'});
+    },150);
+  }
   setTimeout(()=>{$('addMsg').textContent='';},900);
 });
 $('btnClearAsset').addEventListener('click',clearForm);

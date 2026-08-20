@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- BUILD v1.2.26 cache-bust -->
+  <!-- BUILD v1.2.29 uninspected-filter -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>ROTE Mobile Inspector (Offline)</title>
-  <link rel="manifest" href="manifest.webmanifest?v=26">
-  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="manifest" href="manifest.webmanifest?v=274">
+  <link rel="stylesheet" href="styles.css?v=274">
 </head>
 <body>
 <header class="topbar">
@@ -48,15 +48,43 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card" id="addAssetCard">
     <h2>Add an asset</h2>
 
     <div class="grid2">
       <label>Asset ID<input id="assetId" type="text" inputmode="numeric" placeholder="e.g., 340776"></label>
-      <label>Asset designation<input id="assetDesignation" type="text" placeholder="e.g., FOH Bar 1 / LX Bar 2"></label>
-      <label>Asset type
-        <input id="assetTypeInput" list="assetTypeList" placeholder="Start typing to filter…">
-        <datalist id="assetTypeList"></datalist>
+      <label>Customer Asset Designation
+        <select id="assetDesignation">
+        <option value=""></option>
+        <option>Stage Left</option>
+        <option>Stage Right</option>
+        <option>Centre Stage</option>
+        <option>Downstage</option>
+        <option>Downstage Left</option>
+        <option>Downstage Centre</option>
+        <option>Downstage Right</option>
+        <option>Upstage</option>
+        <option>Upstage Left</option>
+        <option>Upstage Centre</option>
+        <option>Upstage Right</option>
+        <option>Auditorium</option>
+        <option>Auditorium Left</option>
+        <option>Auditorium Centre</option>
+        <option>Auditorium Right</option>
+        <option>Auditorium Front</option>
+        <option>Auditorium Front Left</option>
+        <option>Auditorium Front Right</option>
+        <option>Auditorium Back</option>
+        <option>Auditorium Back Left</option>
+        <option>Auditorium Back Right</option>
+        <option>Other</option>
+        </select>
+      </label>
+      <label id="assetDesignationOtherWrap" class="hidden">Customer Asset Designation note<input id="assetDesignationOther" type="text" placeholder="Add note"></label>
+      <label>Customer Asset ID (if one exists)<input id="customerAssetId" type="text" placeholder="Customer reference / local asset ID"></label>
+      <label class="assetTypeWrap">Asset type
+        <input id="assetTypeInput" type="text" autocomplete="off" placeholder="Start typing to filter…">
+        <div id="assetTypeSuggest" class="suggestBox hidden"></div>
       </label>
       <label class="span2">Notes<input id="typeNotes" type="text" placeholder="extra notes (optional)"></label>
       <label class="span2">WLL / SWL / OWL<input id="loadInfo" type="text" placeholder="e.g., WLL 150kg, SWL 150kg UDL, OWL 15kg"></label>
@@ -145,6 +173,14 @@
   <section class="card">
     <h2>Assets</h2>
     <div id="progress" class="small" style="margin-bottom:8px"></div>
+    <div class="assetSearchBox">
+      <label class="span2">Search assets
+        <input id="assetSearch" type="search" inputmode="numeric" autocomplete="off" placeholder="Type Asset ID / asset number…">
+      </label>
+      <button id="btnClearSearch" class="btn ghost" type="button">Clear search</button>
+      <button id="btnShowUninspected" class="btn" type="button">Show uninspected only</button>
+      <div id="searchCount" class="small"></div>
+    </div>
     <div class="row">
       <button id="btnSort" class="btn">Sort by Asset ID</button>
       <button id="btnRenumber" class="btn">Renumber 1..n</button>
@@ -173,7 +209,7 @@
   </div>
 
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=274"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
