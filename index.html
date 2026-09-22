@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- BUILD v1.2.31 report-details -->
+  <!-- BUILD v1.2.32 report-details -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>ROTE Mobile Inspector (Offline)</title>
-  <link rel="manifest" href="manifest.webmanifest?v=31">
-  <link rel="stylesheet" href="styles.css?v=31">
+  <link rel="manifest" href="manifest.webmanifest?v=32">
+  <link rel="stylesheet" href="styles.css?v=32">
 </head>
 <body>
 <header class="topbar">
   <div class="title">
     <div class="h1">ROTE Mobile Inspector</div>
-    <div class="sub">v1.2.31 • Offline-first • Copy/paste for SafetyCulture</div>
+    <div class="sub">v1.2.32 • Offline-first • Copy/paste for SafetyCulture</div>
   </div>
   <div class="actions">
     <button id="btnSave" class="btn">Save</button>
@@ -52,6 +52,10 @@
     </div>
   </section>
 
+<section class="card" id="assetDetailsCard"><h2>Asset details</h2><div class="grid2"><label>Have assets previously been recorded?<select id="assetsPreviouslyRecorded"><option value="">Choose…</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Have existing assets been checked and photos/information updated?<select id="existingAssetsChecked"><option value="">Choose…</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Any assets added since last visit?<select id="assetsAdded"><option value="">Choose…</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Any assets removed since last visit?<select id="assetsRemoved"><option value="">Choose…</option><option value="yes">Yes</option><option value="no">No</option></select></label></div><div id="allAssetsAddedWrap" class="hidden"><label class="chk"><input type="checkbox" id="allAssetsAddedConfirmed"> All assets have been added to the Assets function.</label><p class="small">If you fail to do this as part of the inspection, you may be asked to return to site.</p></div></section>
   <section class="card hidden" id="exportReview" aria-live="polite"><h2>Check before export</h2><ul id="exportIssues"></ul><p>You can export an unfinished inspection as a draft without losing your work.</p><div class="row"><button class="btn" id="btnExportDraft">Export draft JSON</button><button class="btn ghost" id="btnCloseReview">Back to inspection</button></div></section>
 
   <section class="card" id="addAssetCard">
@@ -218,7 +222,7 @@
   </div>
 
 
-<script src="app.js?v=31"></script>
+<script src="app.js?v=32"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});

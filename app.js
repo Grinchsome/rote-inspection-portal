@@ -57,6 +57,34 @@ const escapeHtml=(s)=>String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;
 const idKey=(v)=>{const m=String(v||"").match(/(\d+)/);return m?parseInt(m[1],10):1e12;};
 const selectedMulti=(sel)=>Array.from(sel.selectedOptions).map(o=>o.value);
 const metaFields=['customer','site','space','inspectionDate','nextExaminationDate','previousInspectionDate','reportOutcome','inspectorCompany','inspectorComments'];
+
+const assetQuestions=[["assetsPreviouslyRecorded","Have assets previously been recorded?"],["existingAssetsChecked","Have existing assets been checked and photos/information updated?"],["assetsAdded","Any assets added since last visit?"],["assetsRemoved","Any assets removed since last visit?"]];
+function showAssetConfirmation(){
+  const required=$('assetsPreviouslyRecorded').value==='no';
+  $('allAssetsAddedWrap').classList.toggle('hidden',!required);
+  if(!required)$('allAssetsAddedConfirmed').checked=false;
+}
+function populateAssetDetails(){
+  for(const [key] of assetQuestions)$(key).value=['yes','no'].includes(data.meta[key])?data.meta[key]:'';
+  $('allAssetsAddedConfirmed').checked=data.meta.allAssetsAddedConfirmed===true;
+  showAssetConfirmation();
+}
+function cleanInactiveFindings(r){
+  for(const [flag,previous,fields] of [['advisory','prevAdv',['advActions','advNotes','improvements']],['fail','prevFail',['failDefects','failOther','failNotes','defects']],['limitation','prevLim',['limDetails','limNotes','limitations']]]){
+    if(r[flag])continue;
+    const parts=[r[previous],...fields.flatMap(k=>Array.isArray(r[k])?r[k]:[r[k]])].filter(v=>String(v||'').trim());
+    r[previous]=[...new Set(parts)].join('\n');
+    for(const key of fields)r[key]=Array.isArray(r[key])?[]:'';
+  }
+  return r;
+}
+function findingButtons(r,i){
+  return [['adv','advisory','prevAdv','advisory'],['fail','fail','prevFail','fail'],['lim','limitation','prevLim','limitation']].map(([kind,flag,previous,label])=>
+    (r[previous] ? '<button type="button" class="tagBtn historyTag" data-info="'+kind+'" data-history="true" data-i="'+i+'">Previous '+label+'</button>' : '')+
+    (r[flag] ? '<button type="button" class="tagBtn tagBtn-'+kind+'" data-info="'+kind+'" data-i="'+i+'">Current '+label+'</button>' : '')
+  ).join('');
+}
+
 function dateISO(value){
   const s=String(value||'').trim(); if(!s)return '';
   let y,m,d, match;
@@ -69,18 +97,22 @@ function dateISO(value){
 function nextAnnual(value){const iso=dateISO(value);if(!iso)return '';const [y,m,d]=iso.split('-').map(Number);const day=Math.min(d,new Date(Date.UTC(y+1,m,0)).getUTCDate());return [y+1,String(m).padStart(2,'0'),String(day).padStart(2,'0')].join('-');}
 function populateMeta(){
   data.meta={inspectorCompany:'Stage Electrics',...data.meta};
+  populateAssetDetails();
   for(const id of metaFields){let value=data.meta[id]||'';if(id.includes('Date'))value=dateISO(value);$(id).value=value;}
   $('nextExaminationDate').value=nextAnnual($('inspectionDate').value);
 }
 function save(){
   $('nextExaminationDate').value=nextAnnual($('inspectionDate').value);
   for(const id of metaFields)data.meta[id]=$(id).value||'';
-  data.schemaVersion='1.2.31';data.meta.examinationIntervalMonths=12;
+  for(const [key] of assetQuestions)data.meta[key]=$(key).value;
+  data.meta.allAssetsAddedConfirmed=$('assetsPreviouslyRecorded').value==='no' && $('allAssetsAddedConfirmed').checked;
+  data.records.forEach(cleanInactiveFindings);
+  data.schemaVersion='1.2.32';data.meta.examinationIntervalMonths=12;
   localStorage.setItem('rote_mobile_inspector_v1',JSON.stringify(data));
 }
 function load(){
   try{const raw=localStorage.getItem('rote_mobile_inspector_v1');if(raw){const parsed=JSON.parse(raw);if(parsed&&Array.isArray(parsed.records))data=parsed;}}catch(e){}
-  data.meta=data.meta||{};populateMeta();render();updateProgress();
+  data.meta=data.meta||{};data.records.forEach(cleanInactiveFindings);populateMeta();render();updateProgress();
 }
 function fillSelect(sel,items){sel.innerHTML="";for(const it of items){const o=document.createElement("option");o.value=it;o.textContent=it;sel.appendChild(o);}}
 function fillDatalist(dl,items){dl.innerHTML="";for(const it of items){const o=document.createElement("option");o.value=it;dl.appendChild(o);}}
@@ -120,12 +152,13 @@ function badge(t){
   return `<span class="badge badge-${cls}">${t}</span>`;
 }
 
-function showInfo(kind, text){
+function showInfo(kind, text, history){
   const modal = $('infoModal');
   if(!modal) return;
   const titleEl = $('infoModalTitle');
   const bodyEl = $('infoModalBody');
-  const titles = {adv:'Advisory (previous)', fail:'Fail (previous)', lim:'Limitation (previous)'};
+  const prefix=history?'Previous ':'Current ';
+  const titles = {adv:prefix+'advisory', fail:prefix+'fail', lim:prefix+'limitation'};
   if(titleEl) titleEl.textContent = titles[kind] || 'Details';
   if(bodyEl) bodyEl.textContent = text || '';
   modal.classList.remove('hidden');
@@ -163,7 +196,7 @@ const conds=[];if(r.pass)conds.push('Pass');if(r.advisory)conds.push('Advisory')
 div.innerHTML=`<div class="assetHead"><div><div><strong>Asset ${r.assetNo||i+1}</strong> — ID ${escapeHtml(r.assetId||"")}${r.assetDesignation?(' — '+escapeHtml(r.assetDesignation)+(r.assetDesignationOther?' ('+escapeHtml(r.assetDesignationOther)+')':'')):''}${r.customerAssetId?(' — Customer Asset ID: '+escapeHtml(r.customerAssetId)):''} — ${escapeHtml(r.assetType||"")}</div>${r.manufacturerModel?`<div class="small">Manufacturer &amp; Model: ${escapeHtml(r.manufacturerModel)}</div>`:""}${r.previousInspectionDate?`<div class="small">Previous inspection: ${escapeHtml(r.previousInspectionDate)}</div>`:""}${r.typeNotes?`<div class="small">Notes: ${escapeHtml(r.typeNotes)}</div>`:""}</div>
 <div class="badges">${conds.map(badge).join("")}</div></div>
 <div class="row" style="margin-top:10px"><label class="small" style="display:flex;align-items:center;gap:8px;margin-right:10px;"><input type="checkbox" data-inspected="${i}" ${r.inspected?"checked":""}> Inspected</label>
-        ${((r.prevAdv||(r.advActions&&r.advActions.length)||(r.improvements&&r.improvements.length)) || (r.prevFail||(r.failDefects&&r.failDefects.length)||(r.defects&&r.defects.length)) || (r.prevLim||r.limDetails||r.limNotes||(r.limitations&&r.limitations.length)))?`<div class=\"row noSelect\" style=\"gap:10px;flex-wrap:wrap;margin-top:6px\">${(r.prevAdv||(r.advActions&&r.advActions.length)||(r.improvements&&r.improvements.length))?`<button type=\"button\" class=\"tagBtn tagBtn-adv\" data-info=\"adv\" data-i=\"${i}\">View advisory</button>`:''}${(r.prevFail||(r.failDefects&&r.failDefects.length)||(r.defects&&r.defects.length))?`<button type=\"button\" class=\"tagBtn tagBtn-fail\" data-info=\"fail\" data-i=\"${i}\">View fail</button>`:''}${(r.prevLim||r.limDetails||r.limNotes||(r.limitations&&r.limitations.length))?`<button type=\"button\" class=\"tagBtn tagBtn-lim\" data-info=\"lim\" data-i=\"${i}\">View limitation</button>`:''}</div>`:''}
+        ${findingButtons(r,i)}
         <button class="btn" data-edit="${i}">Edit</button>
         <button class="btn danger" data-del="${i}">Delete</button></div>`;
 host.appendChild(div);});
@@ -173,11 +206,10 @@ host.querySelectorAll('[data-info]').forEach(btn=>{
     const i=parseInt(btn.getAttribute('data-i'),10);
     const kind=btn.getAttribute('data-info');
     const a=data.records[i]; if(!a) return;
-    let msg='';
-    if(kind==='adv') msg = a.prevAdv || (a.advActions||[]).join('\n') || '';
-    if(kind==='fail') msg = a.prevFail || (a.failDefects||[]).join('\n') || '';
-    if(kind==='lim') msg = a.prevLim || a.limDetails || a.limNotes || (a.limitations||[]).join('\\n') || '';
-    showInfo(kind, msg || '(no details)');
+    const history=btn.getAttribute('data-history')==='true';
+    const fields={adv:['prevAdv','advActions','advNotes'],fail:['prevFail','failDefects','failOther','failNotes'],lim:['prevLim','limDetails','limNotes']}[kind];
+    const msg=history?a[fields[0]]:fields.slice(1).flatMap(k=>Array.isArray(a[k])?a[k]:[a[k]]).filter(Boolean).join('\n');
+    showInfo(kind, msg || '(no details)', history);
   };
   btn.addEventListener('click', open);
   btn.addEventListener('touchstart', open, {passive:false});
@@ -221,14 +253,14 @@ host.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',(
   // restore multiselects
   if($('advActions')) Array.from($('advActions').options).forEach(o=>o.selected = (a.advActions||[]).includes(o.value));
   if($('advNotes')) $('advNotes').value = a.advNotes||'';
-  if($('prevAdv')) $('prevAdv').value = a.prevAdv || (a.advActions||[]).join('\n');
+  if($('prevAdv')) $('prevAdv').value = a.prevAdv || '';
   if($('failDefects')) Array.from($('failDefects').options).forEach(o=>o.selected = (a.failDefects||[]).includes(o.value));
   if($('failOther')) $('failOther').value = a.failOther||'';
   if($('failNotes')) $('failNotes').value = a.failNotes||'';
-  if($('prevFail')) $('prevFail').value = a.prevFail || (a.failDefects||[]).join('\n');
+  if($('prevFail')) $('prevFail').value = a.prevFail || '';
   if($('limDetails')) $('limDetails').value = a.limDetails || a.limitationDetails || '';
   if($('limNotes')) $('limNotes').value = a.limNotes||'';
-  if($('prevLim')) $('prevLim').value = a.prevLim || a.limNotes || '';
+  if($('prevLim')) $('prevLim').value = a.prevLim || '';
   if($('thisInspection')) $('thisInspection').value = a.thisInspection||'';
   $('btnAddAsset').textContent = 'Update asset';
   $('btnCancelEdit').style.display = '';
@@ -244,6 +276,9 @@ if(m.previousInspectionDate)lines.push('Previous inspection date: '+m.previousIn
 if(m.inspectorCompany)lines.push('Inspector company: '+m.inspectorCompany);
 if(m.inspectorComments)lines.push('Inspector comments: '+m.inspectorComments);
 if(m.reportOutcome)lines.push(`Report outcome: ${m.reportOutcome}`.trim());lines.push("");
+for(const [key,label] of assetQuestions)lines.push(label+' '+(m[key]==='yes'?'Yes':m[key]==='no'?'No':'Not answered'));
+if(m.assetsPreviouslyRecorded==='no')lines.push('All assets have been added to the Assets function: '+(m.allAssetsAddedConfirmed?'Confirmed':'Not confirmed'));
+lines.push('');
 for(const r of data.records){
 lines.push(`Asset ${r.assetNo} — ID ${r.assetId}${r.assetDesignation?(' — '+r.assetDesignation):''}${r.assetDesignationOther?(' ('+r.assetDesignationOther+')'):''}${r.customerAssetId?(' — Customer Asset ID: '+r.customerAssetId):''} — ${r.assetType}`.trim());
 const c=[];if(r.pass)c.push("Pass");if(r.advisory)c.push("Advisory");if(r.limitation)c.push("Limitation");if(r.fail)c.push("Fail");
@@ -276,6 +311,9 @@ lines.push("");}
 $('copyText').value=lines.join("\n");}
 function exportIssues(){
  const issues=[];
+ for(const [key,label] of assetQuestions)if(!['yes','no'].includes(data.meta[key]))issues.push('Asset details: '+label+' — choose Yes or No.');
+ if(data.meta.assetsPreviouslyRecorded==='no' && data.meta.allAssetsAddedConfirmed!==true)issues.push('Confirm all assets have been added to the Assets function.');
+ if(data.meta.existingAssetsChecked==='no')issues.push('Existing asset records/photos have not been confirmed as checked.');
  for(const [key,label] of [['customer','Customer'],['site','Site'],['space','Space'],['inspectionDate','Inspection date'],['reportOutcome','Report outcome']])if(!data.meta[key])issues.push(label+' is missing.');
  if(!data.records.length)issues.push('No assets recorded.');
  if(editIndex!==null)issues.push('An asset is being edited. Update the asset to include those changes.');
@@ -303,13 +341,13 @@ function importJSON(file){
         data.records = (obj.records||[]).map(r=>{
           const rr = {inspected:false,
       prevAdv:'',prevFail:'',prevLim:'', ...r};
-          rr.prevAdv = rr.prevAdv || rr.advDetails || rr.advisoryDetails || (rr.advActions && rr.advActions.length ? rr.advActions.join('\\n') : '') || (rr.improvements && rr.improvements.length ? rr.improvements.join('\\n') : '') || '';
-          rr.prevFail = rr.prevFail || rr.failDetails || rr.defectDetails || (rr.failDefects && rr.failDefects.length ? rr.failDefects.join('\\n') : '') || (rr.defects && rr.defects.length ? rr.defects.join('\\n') : '') || '';
+          rr.prevAdv = rr.prevAdv || rr.advDetails || rr.advisoryDetails || ''; 
+          rr.prevFail = rr.prevFail || rr.failDetails || rr.defectDetails || ''; 
           rr.assetDesignationOther = rr.assetDesignationOther || '';
           rr.customerAssetId = rr.customerAssetId || '';
           rr.limDetails = rr.limDetails || rr.limitationDetails || '';
-          rr.prevLim = rr.prevLim || rr.limDetails || rr.limitationDetails || (rr.limNotes ? rr.limNotes : '') || (rr.limitations && rr.limitations.length ? rr.limitations.join('\\n') : '') || '';
-          return rr;
+          rr.prevLim = rr.prevLim || ''; 
+          return cleanInactiveFindings(rr);
         });
         editIndex=null;clearForm();$('btnAddAsset').textContent='Add asset';$('exportReview').classList.add('hidden');
         save();
@@ -353,7 +391,7 @@ w.document.write(`<html><head><meta name="viewport" content="width=device-width,
 <div class="meta">Site: ${escapeHtml(m.site||"")}<br/>Space: ${escapeHtml(m.space||"")}${m.inspectionDate?("<br/>Report: "+escapeHtml(m.inspectionDate)):""}</div>${lines}
 <script>window.focus();</script></body></html>`);w.document.close();}
 async function init(){
-const cfg=await fetch('./data.json?v=31', {cache:'no-store'}).then(r=>r.json());
+const cfg=await fetch('./data.json?v=32', {cache:'no-store'}).then(r=>r.json());
 setupAssetTypeFilter(cfg.assetTypes||[]);fillSelect($('advActions'),cfg.advisoryActions);fillSelect($('failDefects'),cfg.failDefects);
 ['cAdv','cFail','cLim'].forEach(id=>$(id).addEventListener('change',showBlocks));
 if($('assetDesignation')) $('assetDesignation').addEventListener('change',()=>{
@@ -464,6 +502,8 @@ load();clearForm();}});
 $('btnPrint').addEventListener('click',printable);
 $('btnWord').addEventListener('click',exportWord);
 metaFields.forEach(id=>$(id).addEventListener('input',save));
+assetQuestions.forEach(([key])=>$(key).addEventListener('change',()=>{showAssetConfirmation();save();}));
+$('allAssetsAddedConfirmed').addEventListener('change',save);
 $('btnCancelEdit').style.display='none';
 load();clearForm();showBlocks();}
 init();
