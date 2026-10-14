@@ -41,6 +41,7 @@ function setupAssetTypeFilter(items){
         box.classList.add('hidden');
         box.innerHTML = '';
         input.blur();
+        save();
       };
       item.addEventListener('click', choose);
       item.addEventListener('touchstart', choose, {passive:false});
@@ -98,17 +99,62 @@ function nextAnnual(value){const iso=dateISO(value);if(!iso)return '';const [y,m
 function populateMeta(){
   data.meta={inspectorCompany:'Stage Electrics',...data.meta};
   populateAssetDetails();
-  for(const id of metaFields){let value=data.meta[id]||'';if(id.includes('Date'))value=dateISO(value);$(id).value=value;}
+  for(const id of metaFields){let value=data.meta[id]||'';if(id==='nextExaminationDate')value=dateISO(value);$(id).value=value;}
   $('nextExaminationDate').value=nextAnnual($('inspectionDate').value);
 }
+
+function assetDraftFields(){return Array.from($('addAssetCard').querySelectorAll('input[id],select[id],textarea[id]'));}
+function captureAssetDraft(){
+  const fields={};let hasEntry=false;
+  for(const el of assetDraftFields()){
+    const value=el.type==='checkbox'?el.checked:el.multiple?selectedMulti(el):el.value;
+    fields[el.id]=value;
+    if(!el.readOnly && (Array.isArray(value)?value.length:typeof value==='boolean'?value:String(value||'').trim()))hasEntry=true;
+  }
+  return hasEntry?{fields,editingAssetId:editIndex===null?null:String(data.records[editIndex]?.assetId||''),editingIndex:editIndex}:null;
+}
+function restoreAssetDraft(){
+  const draft=data.assetDraft;if(!draft||!draft.fields)return;
+  for(const el of assetDraftFields()){
+    if(!Object.prototype.hasOwnProperty.call(draft.fields,el.id))continue;
+    const value=draft.fields[el.id];
+    if(el.type==='checkbox')el.checked=value===true;
+    else if(el.multiple){
+      const values=Array.isArray(value)?value:[];
+      for(const item of values)if(!Array.from(el.options).some(o=>o.value===item)){const o=document.createElement('option');o.value=item;o.textContent=item;el.appendChild(o);}
+      Array.from(el.options).forEach(o=>o.selected=values.includes(o.value));
+    }else el.value=typeof value==='string'?value:'';
+  }
+  editIndex=null;
+  if(draft.editingAssetId!==null){
+    const i=draft.editingIndex;
+    const found=Number.isInteger(i)&&data.records[i]&&String(data.records[i].assetId||'')===draft.editingAssetId?i:data.records.findIndex(r=>String(r.assetId||'')===draft.editingAssetId);
+    if(found>=0)editIndex=found;
+  }
+  $('btnAddAsset').textContent=editIndex===null?'Add asset':'Update asset';
+  $('btnCancelEdit').style.display=editIndex===null?'none':'';
+  $('assetDesignationOtherWrap').classList.toggle('hidden',$('assetDesignation').value!=='Other');
+  $('failOtherWrap').classList.toggle('hidden',!selectedMulti($('failDefects')).some(s=>s.toLowerCase().startsWith('other')));
+  showBlocks();
+  $('saveStatus').textContent='Unfinished asset entry restored. Continue, then tap Add asset or Update asset.';
+}
+
 function save(){
+  data.assetDraft=captureAssetDraft();
   $('nextExaminationDate').value=nextAnnual($('inspectionDate').value);
   for(const id of metaFields)data.meta[id]=$(id).value||'';
   for(const [key] of assetQuestions)data.meta[key]=$(key).value;
   data.meta.allAssetsAddedConfirmed=$('assetsPreviouslyRecorded').value==='no' && $('allAssetsAddedConfirmed').checked;
   data.records.forEach(cleanInactiveFindings);
-  data.schemaVersion='1.2.32';data.meta.examinationIntervalMonths=12;
-  localStorage.setItem('rote_mobile_inspector_v1',JSON.stringify(data));
+  data.schemaVersion='1.2.36';data.meta.examinationIntervalMonths=12;
+  try{
+    localStorage.setItem('rote_mobile_inspector_v1',JSON.stringify(data));
+    $('saveStatus').textContent='Saved on this device'+(data.assetDraft?' — unfinished asset entry included.':'.');
+    return true;
+  }catch(e){
+    $('saveStatus').textContent='Could not save on this device. Export JSON to keep a backup before closing.';
+    return false;
+  }
 }
 function load(){
   try{const raw=localStorage.getItem('rote_mobile_inspector_v1');if(raw){const parsed=JSON.parse(raw);if(parsed&&Array.isArray(parsed.records))data=parsed;}}catch(e){}
@@ -141,10 +187,10 @@ function setDesignationValue(value, note){
     if(wrap) wrap.classList.add('hidden');
   }
 }
-function clearForm(){['prevAdv','prevFail','prevLim','assetId','assetDesignation','assetDesignationOther','customerAssetId','manufacturerModel','assetPreviousInspectionDate','typeNotes','loadInfo','advNotes','failOther','failNotes','limDetails','limNotes','thisInspection','assetTypeInput'].forEach(id=>{const el=$(id); if(el) el.value='';});
+function clearForm(){['assetDesignation','prevAdv','prevFail','prevLim','assetId','assetDesignation','assetDesignationOther','customerAssetId','manufacturerModel','assetPreviousInspectionDate','typeNotes','loadInfo','advNotes','failOther','failNotes','limDetails','limNotes','thisInspection','assetTypeInput'].forEach(id=>{const el=$(id); if(el) el.value='';});
 ['cPass','cFail','cAdv','cLim','chkGenericPhotos','chkFixingsPhotos','chkObsPhotos','chkRemedial','chkGenericPhotosF','chkFixingsPhotosF','chkObsPhotosF','chkRemedialF','chkLimDetails','chkLimPhotos'].forEach(id=>{const el=$(id); if(el) el.checked=false;});
 if($('advActions')) $('advActions').selectedIndex=-1;if($('failDefects')) $('failDefects').selectedIndex=-1;if($('failOtherWrap')) $('failOtherWrap').classList.add('hidden');if($('assetTypeInput')) $('assetTypeInput').value='';if($('assetTypeSuggest')) $('assetTypeSuggest').classList.add('hidden');
-showBlocks();$('addMsg').textContent="";}
+$('assetDesignationOtherWrap').classList.add('hidden');showBlocks();$('addMsg').textContent="";save();}
 function sortAssets(){const editing=editIndex===null?null:data.records[editIndex];data.records.sort((a,b)=>idKey(a.assetId)-idKey(b.assetId));if(editing)editIndex=data.records.indexOf(editing);}
 function renumber(){data.records.forEach((r,i)=>r.assetNo=i+1);}
 function badge(t){
@@ -243,7 +289,7 @@ host.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',(
   $('assetTypeInput').value = a.assetType||'Other';
   $('typeNotes').value = a.typeNotes||'';
   $('manufacturerModel').value=a.manufacturerModel||'';
-  $('assetPreviousInspectionDate').value=dateISO(a.previousInspectionDate);
+  $('assetPreviousInspectionDate').value=a.previousInspectionDate||'';
   for(const key of ['chkGenericPhotos','chkFixingsPhotos','chkObsPhotos','chkRemedial','chkLimDetails','chkLimPhotos']){if($(key))$(key).checked=!!a[key];if($(key+'F'))$(key+'F').checked=!!a[key];}
   if($('loadInfo')) $('loadInfo').value = a.loadInfo||'';
   $('cPass').checked = !!a.pass;
@@ -265,6 +311,7 @@ host.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',(
   $('btnAddAsset').textContent = 'Update asset';
   $('btnCancelEdit').style.display = '';
   showBlocks();
+  save();
   const addCard=$('addAssetCard'); if(addCard) addCard.scrollIntoView({behavior:'smooth',block:'start'});
 }));}
 function buildCopy(){sortAssets();renumber();save();
@@ -350,8 +397,8 @@ function importJSON(file){
           return cleanInactiveFindings(rr);
         });
         editIndex=null;clearForm();$('btnAddAsset').textContent='Add asset';$('exportReview').classList.add('hidden');
-        save();
         if($('btnCancelEdit')) $('btnCancelEdit').style.display='none';
+        data.assetDraft=obj.assetDraft||null;restoreAssetDraft();save();
         sortAssets(); renumber(); render(); updateProgress();
       }
       else {throw new Error("Missing asset records");}
@@ -391,7 +438,7 @@ w.document.write(`<html><head><meta name="viewport" content="width=device-width,
 <div class="meta">Site: ${escapeHtml(m.site||"")}<br/>Space: ${escapeHtml(m.space||"")}${m.inspectionDate?("<br/>Report: "+escapeHtml(m.inspectionDate)):""}</div>${lines}
 <script>window.focus();</script></body></html>`);w.document.close();}
 async function init(){
-const cfg=await fetch('./data.json?v=32', {cache:'no-store'}).then(r=>r.json());
+const cfg=await fetch('./data.json?v=36', {cache:'no-store'}).then(r=>r.json());
 setupAssetTypeFilter(cfg.assetTypes||[]);fillSelect($('advActions'),cfg.advisoryActions);fillSelect($('failDefects'),cfg.failDefects);
 ['cAdv','cFail','cLim'].forEach(id=>$(id).addEventListener('change',showBlocks));
 if($('assetDesignation')) $('assetDesignation').addEventListener('change',()=>{
@@ -505,6 +552,20 @@ metaFields.forEach(id=>$(id).addEventListener('input',save));
 assetQuestions.forEach(([key])=>$(key).addEventListener('change',()=>{showAssetConfirmation();save();}));
 $('allAssetsAddedConfirmed').addEventListener('change',save);
 $('btnCancelEdit').style.display='none';
-load();clearForm();showBlocks();}
+load();restoreAssetDraft();showBlocks();
+$('addAssetCard').addEventListener('input',save);
+$('addAssetCard').addEventListener('change',save);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save();});
+window.addEventListener('pagehide',save);
+}
 init();
 try{$('infoModalClose').addEventListener('click',hideInfo);$('infoModal').addEventListener('click',(ev)=>{if(ev.target && ev.target.id==='infoModal') hideInfo();});}catch(e){}
+
+let installPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('btnInstall').classList.remove('hidden');});
+$('btnInstall').addEventListener('click',async()=>{
+  if(!installPrompt)return;
+  const prompt=installPrompt;installPrompt=null;$('btnInstall').classList.add('hidden');
+  await prompt.prompt();await prompt.userChoice;
+});
+window.addEventListener('appinstalled',()=>{installPrompt=null;$('btnInstall').classList.add('hidden');});

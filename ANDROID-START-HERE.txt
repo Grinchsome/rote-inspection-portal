@@ -1,0 +1,42 @@
+ROTE Mobile Inspector v1.2.36 - ANDROID UPDATE
+
+This package includes the free-text date fields, all 23 updated advisory choices,
+and the existing report/asset workflow from your uploaded working version.
+It also adds a home-screen icon, Android installation support and automatic
+recovery of unfinished asset entries, including edits to an existing asset.
+
+UPDATE THE WEBSITE FIRST
+1. In your existing app, export your current inspection JSON as a backup.
+2. Extract this ZIP. Open the rote-inspection-portal-main folder.
+3. Upload ALL CONTENTS into the repository folder containing your existing
+   index.html. Include data.json, sw.js, .nojekyll and the new icons folder.
+   Do not upload the ZIP itself or add an extra enclosing folder.
+4. Publish the change as usual and allow GitHub Pages to finish updating.
+5. Open the same website in Chrome while online. Refresh, then check the heading
+   says v1.2.36. If it still says v1.2.32, the new version is not loaded yet.
+   Check the upload location and website address; do not clear app storage.
+6. Check that Inspection commenced on accepts 14/10/2026 and that Advisory Details
+   includes System replacement is recommended. Imported assets can retain old
+   selected advisory wording; the available choices use the new list.
+
+INSTALL ON ANDROID
+On the updated HTTPS website, tap Install app if the button appears. Otherwise
+open Chrome's three-dot menu and choose Add to home screen / Install app (the
+wording varies by Chrome version). Launch ROTE Inspector from its new icon.
+Open it online once to finish preparing the files before using it offline.
+The browser and installed app use the same device storage when installed from
+this same site in the same Chrome profile. A separate test website has separate
+inspection storage; export/import JSON to move work between sites.
+
+RESUMING WORK
+Inspection details and unfinished asset entries save as you type. After reopening,
+an unfinished entry is restored to the form. Tap Add asset or Update asset to
+commit it to the asset list. Clear and Cancel edit discard the unfinished form.
+Exported inspection JSON includes the unfinished entry for recovery on import.
+A message reports whether local saving succeeded. Keep exporting JSON backups.
+Android can still close Chrome or installed apps; installation does not prevent
+that. This update is designed to restore saved work when you reopen.
+
+This ZIP has not changed the live or test website automatically.
+The software checks cover recovery and offline behavior; test installation and
+recovery on your Android phone before relying on it during an inspection.

@@ -1,20 +1,23 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- BUILD v1.2.32 report-details -->
+  <!-- BUILD v1.2.36 report-details -->
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#0b1020"/>
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
   <title>ROTE Mobile Inspector (Offline)</title>
-  <link rel="manifest" href="manifest.webmanifest?v=32">
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="manifest" href="manifest.webmanifest?v=36">
+  <link rel="stylesheet" href="styles.css?v=36">
 </head>
 <body>
 <header class="topbar">
   <div class="title">
     <div class="h1">ROTE Mobile Inspector</div>
-    <div class="sub">v1.2.32 • Offline-first • Copy/paste for SafetyCulture</div>
+    <div class="sub">v1.2.36 • Offline-first • Copy/paste for SafetyCulture</div>
   </div>
   <div class="actions">
+    <button id="btnInstall" class="btn hidden" type="button">Install app</button>
     <button id="btnSave" class="btn">Save</button>
     <button id="btnExport" class="btn">Export JSON</button>
     <label class="btn ghost">
@@ -25,15 +28,16 @@
 </header>
 
 <main class="container">
+  <p id="saveStatus" class="small" role="status" aria-live="polite">Ready. Entries are saved on this device.</p>
   <section class="card">
     <h2>Inspection details</h2>
     <div class="grid2">
       <label>Customer<input id="customer" type="text" placeholder="e.g., President Kennedy School"></label>
       <label>Site<input id="site" type="text" placeholder="e.g., Barlow Theatre Oldbury"></label>
       <label>Space<input id="space" type="text" placeholder="e.g., Theatre"></label>
-      <label>Inspection commenced on<input id="inspectionDate" type="date"></label>
+      <label>Inspection commenced on<input id="inspectionDate" type="text" autocomplete="off" placeholder="DD/MM/YYYY"></label>
       <label>Latest date of next thorough examination<input id="nextExaminationDate" type="date" readonly><span class="small">12 months from commencement</span></label>
-      <label>Previous inspection date<input id="previousInspectionDate" type="date"><span class="small">Applies to all assets unless an asset has its own date.</span></label>
+      <label>Previous inspection date<input id="previousInspectionDate" type="text" autocomplete="off" placeholder="DD/MM/YYYY"><span class="small">Applies to all assets unless an asset has its own date.</span></label>
       <label>Inspector company<input id="inspectorCompany" type="text" value="Stage Electrics"></label>
       <label class="span2">Overall inspector comments (optional)<textarea id="inspectorComments" rows="3"></textarea></label>
       <label>Report outcome
@@ -97,7 +101,7 @@
         <div id="assetTypeSuggest" class="suggestBox hidden"></div>
       </label>
       <label>Manufacturer &amp; Model<input id="manufacturerModel" type="text" placeholder="e.g., Stage Electrics"></label>
-      <label>Previous inspection date for this asset (optional)<input id="assetPreviousInspectionDate" type="date"><span class="small">Leave blank to use the report date.</span></label>
+      <label>Previous inspection date for this asset (optional)<input id="assetPreviousInspectionDate" type="text" autocomplete="off" placeholder="DD/MM/YYYY"><span class="small">Leave blank to use the report date.</span></label>
       <label class="span2">Asset type / configuration notes<input id="typeNotes" type="text" placeholder="extra notes (optional)"></label>
       <label class="span2">WLL / SWL / OWL<input id="loadInfo" type="text" placeholder="e.g., WLL 150kg, SWL 150kg UDL, OWL 15kg"></label>
     </div>
@@ -222,10 +226,10 @@
   </div>
 
 
-<script src="app.js?v=32"></script>
+<script src="app.js?v=36"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(reg => reg.update().catch(()=>{})).catch(()=>{});
   }
 </script>
 </body>
